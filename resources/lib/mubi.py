@@ -11,6 +11,11 @@ from BeautifulSoup import BeautifulSoup as BS
 Film      = namedtuple('Film', ['title', 'mubi_id', 'artwork', 'metadata'])
 Metadata  = namedtuple('Metadata', ['director', 'year', 'duration', 'country', 'plotoutline', 'plot'])
 
+def save(file_name, msg):
+    file = open(file_name,"wb")
+    file.write(msg.encode("utf-8","ignore"))
+    file.close()
+
 class Mubi(object):
     _URL_MUBI         = "http://mubi.com"
     _URL_MUBI_SECURE  = "https://mubi.com"
@@ -41,6 +46,7 @@ class Mubi(object):
         self._password = password
         login_page = self._session.get(self._mubi_urls["login"]).content
         auth_token = (BS(login_page).find("input", {"name": "authenticity_token"}).get("value"))
+        print auth_token
         session_payload = {'utf8': '✓',
                            'authenticity_token': auth_token,
                            'session[email]': username,
@@ -51,8 +57,9 @@ class Mubi(object):
         self._logger.debug("Logging in as user '%s', auth token is '%s'" % (username, auth_token))
         
         landing_page = self._session.post(self._mubi_urls["session"], data=session_payload)
-        self._userid = BS(landing_page.content).find("a", "header-icon").get("href").split("/")[-1]
-
+        #save("landing.html",landing_page.text)
+        
+        self._userid = BS(landing_page.content).find("a", "link -image").get("href").split("/")[-1]
         self._logger.debug("Login succesful, user ID is '%s'" % self._userid)
 
     def now_showing(self):
@@ -72,13 +79,14 @@ class Mubi(object):
         # </li>
         #<ol>
         page = self._session.get(self._mubi_urls["nowshowing"])
-        items = [x for x in BS(page.content).findAll("li", {"class": "film-media film-tile now-showing-mosaic-item"})]
+        #items = [x for x in BS(page.content).findAll("li", {"class": "film-media film-tile now-showing-mosaic-item"})]
+        items = [x for x in BS(page.content).findAll("li", {"itemtype": "http://schema.org/Movie"})]
         films = []
         for x in items:
 
             # core 
             mubi_id   = x.find('a',   {"class": "app-play-film play-film"}).get("data-filmid")
-            title     = x.find('a', {"class": "film-title tile-text-link"}).text
+            title     = x.find('span', {"itemprop": "name"}).text
             artwork   = x.find('img', {"class": "film-thumb"}).get("src")
             
             # year, director and remaining
